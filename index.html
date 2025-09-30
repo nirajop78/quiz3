@@ -84,7 +84,8 @@
       const correctNewIndex = shuffled.findIndex(x => x.originalIndex === item.a);
       return { q: item.q, opts: shuffled.map(x => x.text), a: correctNewIndex };
     });
-// DOM refs
+
+    // DOM refs
     const progEl = document.getElementById('prog');
     const qEl = document.getElementById('q');
     const optsEl = document.getElementById('opts');
@@ -103,7 +104,7 @@
       msgEl.textContent = '';
 
       const item = questions[idx];
-      progEl.textContent = Question ${idx+1} / ${questions.length};
+      progEl.textContent = `Question ${idx+1} / ${questions.length}`;
       qEl.textContent = item.q;
       optsEl.innerHTML = '';
 
@@ -170,7 +171,7 @@
     function showResults(){
       const app = document.getElementById('app');
       const percent = Math.round((score / questions.length) * 100);
-      app.innerHTML = 
+      app.innerHTML = `
         <div class="center" style="padding:24px">
           <h2>Your Score</h2>
           <div class="score">${score} / ${questions.length}</div>
@@ -179,7 +180,7 @@
             <button id="retry">Retry Quiz</button>
           </div>
         </div>
-      ;
+      `;
       document.getElementById('retry').addEventListener('click', () => {
         location.reload();
       });
