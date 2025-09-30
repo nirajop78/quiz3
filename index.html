@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Stable Quiz (Saved responses)</title>
+  <title>Stable Quiz</title>
   <style>
     :root{
       --bg:#f3f6fb; --card:#ffffff; --muted:#6b7280;
@@ -19,6 +19,9 @@
       width:100%; max-width:900px; background:var(--card); padding:20px; border-radius:12px;
       box-shadow:0 14px 40px rgba(15,23,42,0.06);
     }
+    .header { text-align:center; margin-bottom:20px; }
+    .header img { height:80px; margin-bottom:10px; }
+    .header h1 { margin:0; font-size:1.8rem; color:#111827; }
     #prog{color:var(--muted); margin-bottom:8px}
     h3#q{ margin:6px 0 18px; font-size:1.25rem }
     #opts{ display:grid; gap:10px }
@@ -44,6 +47,12 @@
 </head>
 <body>
   <div id="app">
+    <!-- ✅ Header with logo + Stable Quiz -->
+    <div class="header">
+      <img src="logo.png" alt="Stable Logo" />
+      <h1>Stable Quiz</h1>
+    </div>
+
     <div id="prog" class="small">Question 1 / 1</div>
     <h3 id="q">Question text</h3>
     <div id="opts"></div>
@@ -56,8 +65,8 @@
   </div>
 
   <script>
-    // ---------------- QUESTIONS (Stable / Stability AI) ----------------
-    const bank = [
+    // ---------------- QUESTIONS ----------------
+    const questions = [
       { q: 'Which model popularized image generation using diffusion techniques and is associated with Stability AI?', opts: ['DALL·E 2','Midjourney','Stable Diffusion','BigGAN'], a: 2 },
       { q: 'What core approach does Stable Diffusion use to generate images?', opts: ['GANs','Diffusion-based denoising models','Rule-based rendering','Deterministic rasterization'], a: 1 },
       { q: 'Which programming language is commonly used to run Stable Diffusion implementations?', opts: ['Java','Python','Ruby','PHP'], a: 1 },
@@ -69,35 +78,17 @@
       { q: 'Which file formats are commonly used to save images from Stable Diffusion?', opts: ['.docx','.png or .jpg','.exe','.csv'], a: 1 },
       { q: 'What technique is often used with Stable Diffusion to steer image results using plain language?', opts: ['Visual prompts only','Text prompts / prompt engineering','FTP commands','SQL queries'], a: 1 }
     ];
-    // ------------------------------------------------------------------
+    // -------------------------------------------
 
-    // shuffle utility
-    function shuffle(arr){
-      const a = arr.slice();
-      for(let i=a.length-1;i>0;i--){
-        const j = Math.floor(Math.random()*(i+1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    }
-
-    // choose questions (we'll use all 10 here)
-    const questions = bank.slice(); // use full set (not shuffled order) — you can shuffle if you want
-    // if you prefer random subset: const questions = shuffle(bank).slice(0,4);
-
-    // store responses
-    const responses = []; // each: { idx, q, selectedIndex, selectedText, correctIndex, correctText, correct (bool), ts }
-
-    // DOM refs
     const progEl = document.getElementById('prog');
     const qEl = document.getElementById('q');
     const optsEl = document.getElementById('opts');
     const nextBtn = document.getElementById('next');
     const msgEl = document.getElementById('msg');
 
-    // state
     let idx = 0, score = 0, selectedIndex = null, answered = false;
-    const letters = ['A','B','C','D','E','F'];
+    const letters = ['A','B','C','D'];
+    const responses = [];
 
     function loadQuestion(){
       selectedIndex = null;
@@ -107,13 +98,6 @@
       msgEl.textContent = '';
 
       const item = questions[idx];
-      if(!item){
-        // no question
-        qEl.textContent = 'No question';
-        optsEl.innerHTML = '';
-        return;
-      }
-
       progEl.textContent = `Question ${idx+1} / ${questions.length}`;
       qEl.textContent = item.q;
       optsEl.innerHTML = '';
@@ -125,7 +109,7 @@
 
         const L = document.createElement('div');
         L.className = 'letter';
-        L.textContent = letters[i] || (i+1);
+        L.textContent = letters[i];
 
         const T = document.createElement('div');
         T.textContent = opt;
@@ -134,7 +118,7 @@
         row.appendChild(T);
 
         row.addEventListener('click', () => {
-          if (answered) return; // cannot change after submit
+          if (answered) return;
           document.querySelectorAll('.option').forEach(n => n.classList.remove('selected'));
           row.classList.add('selected');
           selectedIndex = i;
@@ -146,47 +130,40 @@
     }
 
     nextBtn.addEventListener('click', () => {
-      // Submit/mark current question
       if (!answered) {
-        if (selectedIndex === null) return; // no selection
+        if (selectedIndex === null) return;
         answered = true;
         const correct = questions[idx].a;
         const optionEls = Array.from(document.querySelectorAll('.option'));
 
         optionEls.forEach(o => {
           const i = +o.dataset.i;
-          o.style.pointerEvents = 'none'; // disable further clicks
+          o.style.pointerEvents = 'none';
           if (i === correct) o.classList.add('correct');
           if (i === selectedIndex && i !== correct) o.classList.add('wrong');
         });
 
-        // store response
         const resp = {
           idx,
           q: questions[idx].q,
-          selectedIndex,
-          selectedText: questions[idx].opts[selectedIndex],
-          correctIndex: correct,
-          correctText: questions[idx].opts[correct],
-          correct: selectedIndex === correct,
+          selected: questions[idx].opts[selectedIndex],
+          correct: questions[idx].opts[correct],
+          isCorrect: selectedIndex === correct,
           ts: new Date().toISOString()
         };
         responses.push(resp);
 
-        if (resp.correct) {
+        if (resp.isCorrect) {
           score++;
           msgEl.innerHTML = '<span style="color:var(--green);font-weight:700">✔ Correct</span>';
         } else {
           msgEl.innerHTML = '<span style="color:var(--red);font-weight:700">✖ Incorrect</span>';
         }
 
-        // Change button to Next or See Results
         nextBtn.textContent = (idx === questions.length - 1) ? 'See Results' : 'Next';
-        nextBtn.disabled = false;
         return;
       }
 
-      // If already answered, advance to next
       idx++;
       if (idx < questions.length) {
         loadQuestion();
@@ -203,22 +180,14 @@
           <h2>Your Score</h2>
           <div class="score">${score} / ${questions.length}</div>
           <p class="small">${percent}% correct</p>
-
           <div style="margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
             <button id="retry">Retry Quiz</button>
             <button id="download">Download responses (JSON)</button>
-            <button id="viewRaw" class="secondary">View responses</button>
-          </div>
-
-          <div id="rawWrap" style="margin-top:18px; display:none">
-            <h4 class="small">Responses (JSON)</h4>
-            <pre id="raw"></pre>
           </div>
         </div>
       `;
 
       document.getElementById('retry').addEventListener('click', () => {
-        // reset everything and reload fresh
         location.reload();
       });
 
@@ -226,47 +195,13 @@
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(responses, null, 2));
         const dlAnchor = document.createElement('a');
         dlAnchor.setAttribute('href', dataStr);
-        const filename = `quiz-responses-${(new Date()).toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
-        dlAnchor.setAttribute('download', filename);
+        dlAnchor.setAttribute('download', 'stable-quiz-responses.json');
         document.body.appendChild(dlAnchor);
         dlAnchor.click();
         dlAnchor.remove();
       });
-
-      document.getElementById('viewRaw').addEventListener('click', () => {
-        const rawWrap = document.getElementById('rawWrap');
-        const raw = document.getElementById('raw');
-        if(rawWrap.style.display === 'none'){
-          rawWrap.style.display = 'block';
-          raw.textContent = JSON.stringify(responses, null, 2);
-        } else {
-          rawWrap.style.display = 'none';
-        }
-      });
     }
 
-    // keyboard support: arrows + enter
-    document.addEventListener('keydown', (e) => {
-      const opts = Array.from(document.querySelectorAll('.option'));
-      if (!opts.length) return;
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        let next = (selectedIndex === null) ? 0 : Math.min(selectedIndex + 1, opts.length - 1);
-        opts.forEach(n => n.classList.remove('selected'));
-        opts[next].classList.add('selected');
-        selectedIndex = next;
-        nextBtn.disabled = false;
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        let prev = (selectedIndex === null) ? 0 : Math.max(selectedIndex - 1, 0);
-        opts.forEach(n => n.classList.remove('selected'));
-        opts[prev].classList.add('selected');
-        selectedIndex = prev;
-        nextBtn.disabled = false;
-      } else if (e.key === 'Enter') {
-        if (!nextBtn.disabled) nextBtn.click();
-      }
-    });
-
-    // start
     loadQuestion();
   </script>
 </body>
