@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Random Quiz</title>
+  <style>
+    :root{
+      --bg:#f3f6fb; --card:#ffffff; --muted:#6b7280;
+      --primary:#2563eb; --green:#16a34a; --red:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; padding:28px; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      background:var(--bg);
+    }
+    #app{
+      width:100%; max-width:820px; background:var(--card); padding:20px; border-radius:12px;
+      box-shadow:0 14px 40px rgba(15,23,42,0.06);
+    }
+    #prog{color:var(--muted); margin-bottom:8px}
+    h3#q{ margin:6px 0 18px; font-size:1.25rem }
+    #opts{ display:grid; gap:10px }
+    .option{
+      display:flex; gap:12px; align-items:center; padding:12px 14px; border-radius:10px;
+      border:1px solid #e6e9ef; cursor:pointer; background:white; transition:transform .12s, box-shadow .12s;
+    }
+    .option:hover{ transform:translateY(-3px); box-shadow:0 8px 20px rgba(15,23,42,0.04) }
+    .letter{ width:38px; height:38px; border-radius:8px; display:grid; place-items:center; font-weight:700; border:1px solid #eee }
+    .option.selected{ border-color:var(--primary); box-shadow:0 8px 20px rgba(37,99,235,0.06) }
+    .option.correct{ border-color:var(--green); background:rgba(16,185,129,0.06) }
+    .option.wrong{ border-color:var(--red); background:rgba(239,68,68,0.06) }
+    #controls{ display:flex; gap:12px; align-items:center; margin-top:14px }
+    #msg{ color:var(--muted) }
+    button{ padding:10px 14px; border-radius:10px; border:none; background:var(--primary); color:white; cursor:pointer; font-weight:700 }
+    button:disabled{ opacity:0.5; cursor:not-allowed }
+    .score{ font-size:30px; font-weight:800; margin:10px 0 }
+    .center{text-align:center}
+    .small{ color:var(--muted); font-size:0.95rem }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="prog" class="small">Question 1 / 1</div>
+    <h3 id="q">Question text</h3>
+    <div id="opts"></div>
+
+    <div id="controls">
+      <div id="msg" class="small"></div>
+      <div style="flex:1"></div>
+      <button id="next" disabled>Submit</button>
+    </div>
+  </div>
+
+  <script>
+    // ------- QUESTIONS BANK -------
+    const bank = [
+      { q: 'Which planet is known as the Red Planet?', opts: ['Venus','Mars','Jupiter','Mercury'], a: 1 },
+      { q: 'What is the capital of India?', opts: ['Mumbai','New Delhi','Bengaluru','Kolkata'], a: 1 },
+      { q: 'Which language is used to structure web pages?', opts: ['Python','C++','HTML','Java'], a: 2 },
+      { q: 'What is 8 × 7?', opts: ['54','56','64','48'], a: 1 },
+      { q: 'Who wrote "Hamlet"?', opts: ['Dante','Chaucer','Shakespeare','Cervantes'], a: 2 },
+      { q: 'Which gas do plants use for photosynthesis?', opts: ['Oxygen','Nitrogen','Carbon Dioxide','Hydrogen'], a: 2 },
+      { q: 'Which is the largest ocean on Earth?', opts: ['Indian','Pacific','Atlantic','Arctic'], a: 1 },
+      { q: 'What color do you get by mixing red and blue?', opts: ['Orange','Purple','Green','Brown'], a: 1 }
+    ];
+    // ------------------------------
+
+    function shuffle(arr){
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // Random pick 4 questions
+    const totalQuestions = Math.min(4, bank.length);
+    const questions = shuffle(bank).slice(0, totalQuestions).map(item => {
+      const opts = item.opts.map((text, i) => ({ text, originalIndex: i }));
+      const shuffled = shuffle(opts);
+      const correctNewIndex = shuffled.findIndex(x => x.originalIndex === item.a);
+      return { q: item.q, opts: shuffled.map(x => x.text), a: correctNewIndex };
+    });
+// DOM refs
+    const progEl = document.getElementById('prog');
+    const qEl = document.getElementById('q');
+    const optsEl = document.getElementById('opts');
+    const nextBtn = document.getElementById('next');
+    const msgEl = document.getElementById('msg');
+
+    // state
+    let idx = 0, score = 0, selectedIndex = null, answered = false;
+    const letters = ['A','B','C','D'];
+
+    function loadQuestion(){
+      selectedIndex = null;
+      answered = false;
+      nextBtn.disabled = true;
+      nextBtn.textContent = 'Submit';
+      msgEl.textContent = '';
+
+      const item = questions[idx];
+      progEl.textContent = Question ${idx+1} / ${questions.length};
+      qEl.textContent = item.q;
+      optsEl.innerHTML = '';
+
+      item.opts.forEach((opt, i) => {
+        const row = document.createElement('div');
+        row.className = 'option';
+        row.dataset.i = i;
+
+        const L = document.createElement('div');
+        L.className = 'letter';
+        L.textContent = letters[i];
+
+        const T = document.createElement('div');
+        T.textContent = opt;
+
+        row.appendChild(L);
+        row.appendChild(T);
+
+        row.addEventListener('click', () => {
+          if (answered) return;
+          document.querySelectorAll('.option').forEach(n => n.classList.remove('selected'));
+          row.classList.add('selected');
+          selectedIndex = i;
+          nextBtn.disabled = false;
+        });
+
+        optsEl.appendChild(row);
+      });
+    }
+
+    nextBtn.addEventListener('click', () => {
+      if (!answered) {
+        if (selectedIndex === null) return;
+        answered = true;
+        const correct = questions[idx].a;
+        const optionEls = Array.from(document.querySelectorAll('.option'));
+
+        optionEls.forEach(o => {
+          const i = +o.dataset.i;
+          o.style.pointerEvents = 'none';
+          if (i === correct) o.classList.add('correct');
+          if (i === selectedIndex && i !== correct) o.classList.add('wrong');
+        });
+
+        if (selectedIndex === correct) {
+          score++;
+          msgEl.innerHTML = '<span style="color:var(--green);font-weight:700">✔ Correct</span>';
+        } else {
+          msgEl.innerHTML = '<span style="color:var(--red);font-weight:700">✖ Incorrect</span>';
+        }
+
+        nextBtn.textContent = (idx === questions.length - 1) ? 'See Results' : 'Next';
+        return;
+      }
+
+      idx++;
+      if (idx < questions.length) {
+        loadQuestion();
+      } else {
+        showResults();
+      }
+    });
+
+    function showResults(){
+      const app = document.getElementById('app');
+      const percent = Math.round((score / questions.length) * 100);
+      app.innerHTML = 
+        <div class="center" style="padding:24px">
+          <h2>Your Score</h2>
+          <div class="score">${score} / ${questions.length}</div>
+          <p class="small">${percent}% correct</p>
+          <div style="margin-top:18px">
+            <button id="retry">Retry Quiz</button>
+          </div>
+        </div>
+      ;
+      document.getElementById('retry').addEventListener('click', () => {
+        location.reload();
+      });
+    }
+
+    // start
+    loadQuestion();
+  </script>
+</body>
+</html>
