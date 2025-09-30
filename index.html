@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Random Quiz</title>
+  <title>Stable Quiz (Saved responses)</title>
   <style>
     :root{
       --bg:#f3f6fb; --card:#ffffff; --muted:#6b7280;
@@ -16,7 +16,7 @@
       background:var(--bg);
     }
     #app{
-      width:100%; max-width:820px; background:var(--card); padding:20px; border-radius:12px;
+      width:100%; max-width:900px; background:var(--card); padding:20px; border-radius:12px;
       box-shadow:0 14px 40px rgba(15,23,42,0.06);
     }
     #prog{color:var(--muted); margin-bottom:8px}
@@ -34,10 +34,12 @@
     #controls{ display:flex; gap:12px; align-items:center; margin-top:14px }
     #msg{ color:var(--muted) }
     button{ padding:10px 14px; border-radius:10px; border:none; background:var(--primary); color:white; cursor:pointer; font-weight:700 }
+    button.secondary{ background:transparent; color:var(--primary); border:1px solid var(--primary) }
     button:disabled{ opacity:0.5; cursor:not-allowed }
     .score{ font-size:30px; font-weight:800; margin:10px 0 }
     .center{text-align:center}
     .small{ color:var(--muted); font-size:0.95rem }
+    pre#raw { max-height:240px; overflow:auto; background:#f9fafb; padding:12px; border-radius:8px; border:1px solid #eee }
   </style>
 </head>
 <body>
@@ -54,19 +56,22 @@
   </div>
 
   <script>
-    // ------- QUESTIONS BANK -------
+    // ---------------- QUESTIONS (Stable / Stability AI) ----------------
     const bank = [
-      { q: 'Which planet is known as the Red Planet?', opts: ['Venus','Mars','Jupiter','Mercury'], a: 1 },
-      { q: 'What is the capital of India?', opts: ['Mumbai','New Delhi','Bengaluru','Kolkata'], a: 1 },
-      { q: 'Which language is used to structure web pages?', opts: ['Python','C++','HTML','Java'], a: 2 },
-      { q: 'What is 8 × 7?', opts: ['54','56','64','48'], a: 1 },
-      { q: 'Who wrote "Hamlet"?', opts: ['Dante','Chaucer','Shakespeare','Cervantes'], a: 2 },
-      { q: 'Which gas do plants use for photosynthesis?', opts: ['Oxygen','Nitrogen','Carbon Dioxide','Hydrogen'], a: 2 },
-      { q: 'Which is the largest ocean on Earth?', opts: ['Indian','Pacific','Atlantic','Arctic'], a: 1 },
-      { q: 'What color do you get by mixing red and blue?', opts: ['Orange','Purple','Green','Brown'], a: 1 }
+      { q: 'Which model popularized image generation using diffusion techniques and is associated with Stability AI?', opts: ['DALL·E 2','Midjourney','Stable Diffusion','BigGAN'], a: 2 },
+      { q: 'What core approach does Stable Diffusion use to generate images?', opts: ['GANs','Diffusion-based denoising models','Rule-based rendering','Deterministic rasterization'], a: 1 },
+      { q: 'Which programming language is commonly used to run Stable Diffusion implementations?', opts: ['Java','Python','Ruby','PHP'], a: 1 },
+      { q: 'Stability AI is best known for focusing on which field?', opts: ['Quantum computing','Renewable energy','Generative AI / foundation models','Network hardware'], a: 2 },
+      { q: 'Which topic caused big community conversations when Stable Diffusion released models?', opts: ['Open-source vs proprietary licensing','Hardware compatibility','Email rules','DNS configuration'], a: 0 },
+      { q: 'Which of the following is a common use-case for Stable Diffusion?', opts: ['Real-time video conferencing backend','Creating AI-generated images and art','Compiling C programs','Sending encrypted messages'], a: 1 },
+      { q: 'What is typically required to run Stable Diffusion locally with decent speed?', opts: ['High-end GPU (VRAM)','Only a smartphone with 1GB RAM','A fax machine','A dial-up modem'], a: 0 },
+      { q: 'Who was an early public figure associated with Stability AI?', opts: ['Sam Altman','Emad Mostaque','Sundar Pichai','Mark Zuckerberg'], a: 1 },
+      { q: 'Which file formats are commonly used to save images from Stable Diffusion?', opts: ['.docx','.png or .jpg','.exe','.csv'], a: 1 },
+      { q: 'What technique is often used with Stable Diffusion to steer image results using plain language?', opts: ['Visual prompts only','Text prompts / prompt engineering','FTP commands','SQL queries'], a: 1 }
     ];
-    // ------------------------------
+    // ------------------------------------------------------------------
 
+    // shuffle utility
     function shuffle(arr){
       const a = arr.slice();
       for(let i=a.length-1;i>0;i--){
@@ -76,14 +81,12 @@
       return a;
     }
 
-    // Random pick 4 questions
-    const totalQuestions = Math.min(4, bank.length);
-    const questions = shuffle(bank).slice(0, totalQuestions).map(item => {
-      const opts = item.opts.map((text, i) => ({ text, originalIndex: i }));
-      const shuffled = shuffle(opts);
-      const correctNewIndex = shuffled.findIndex(x => x.originalIndex === item.a);
-      return { q: item.q, opts: shuffled.map(x => x.text), a: correctNewIndex };
-    });
+    // choose questions (we'll use all 10 here)
+    const questions = bank.slice(); // use full set (not shuffled order) — you can shuffle if you want
+    // if you prefer random subset: const questions = shuffle(bank).slice(0,4);
+
+    // store responses
+    const responses = []; // each: { idx, q, selectedIndex, selectedText, correctIndex, correctText, correct (bool), ts }
 
     // DOM refs
     const progEl = document.getElementById('prog');
@@ -94,7 +97,7 @@
 
     // state
     let idx = 0, score = 0, selectedIndex = null, answered = false;
-    const letters = ['A','B','C','D'];
+    const letters = ['A','B','C','D','E','F'];
 
     function loadQuestion(){
       selectedIndex = null;
@@ -104,6 +107,13 @@
       msgEl.textContent = '';
 
       const item = questions[idx];
+      if(!item){
+        // no question
+        qEl.textContent = 'No question';
+        optsEl.innerHTML = '';
+        return;
+      }
+
       progEl.textContent = `Question ${idx+1} / ${questions.length}`;
       qEl.textContent = item.q;
       optsEl.innerHTML = '';
@@ -115,7 +125,7 @@
 
         const L = document.createElement('div');
         L.className = 'letter';
-        L.textContent = letters[i];
+        L.textContent = letters[i] || (i+1);
 
         const T = document.createElement('div');
         T.textContent = opt;
@@ -124,7 +134,7 @@
         row.appendChild(T);
 
         row.addEventListener('click', () => {
-          if (answered) return;
+          if (answered) return; // cannot change after submit
           document.querySelectorAll('.option').forEach(n => n.classList.remove('selected'));
           row.classList.add('selected');
           selectedIndex = i;
@@ -136,30 +146,47 @@
     }
 
     nextBtn.addEventListener('click', () => {
+      // Submit/mark current question
       if (!answered) {
-        if (selectedIndex === null) return;
+        if (selectedIndex === null) return; // no selection
         answered = true;
         const correct = questions[idx].a;
         const optionEls = Array.from(document.querySelectorAll('.option'));
 
         optionEls.forEach(o => {
           const i = +o.dataset.i;
-          o.style.pointerEvents = 'none';
+          o.style.pointerEvents = 'none'; // disable further clicks
           if (i === correct) o.classList.add('correct');
           if (i === selectedIndex && i !== correct) o.classList.add('wrong');
         });
 
-        if (selectedIndex === correct) {
+        // store response
+        const resp = {
+          idx,
+          q: questions[idx].q,
+          selectedIndex,
+          selectedText: questions[idx].opts[selectedIndex],
+          correctIndex: correct,
+          correctText: questions[idx].opts[correct],
+          correct: selectedIndex === correct,
+          ts: new Date().toISOString()
+        };
+        responses.push(resp);
+
+        if (resp.correct) {
           score++;
           msgEl.innerHTML = '<span style="color:var(--green);font-weight:700">✔ Correct</span>';
         } else {
           msgEl.innerHTML = '<span style="color:var(--red);font-weight:700">✖ Incorrect</span>';
         }
 
+        // Change button to Next or See Results
         nextBtn.textContent = (idx === questions.length - 1) ? 'See Results' : 'Next';
+        nextBtn.disabled = false;
         return;
       }
 
+      // If already answered, advance to next
       idx++;
       if (idx < questions.length) {
         loadQuestion();
@@ -172,19 +199,72 @@
       const app = document.getElementById('app');
       const percent = Math.round((score / questions.length) * 100);
       app.innerHTML = `
-        <div class="center" style="padding:24px">
+        <div class="center" style="padding:18px">
           <h2>Your Score</h2>
           <div class="score">${score} / ${questions.length}</div>
           <p class="small">${percent}% correct</p>
-          <div style="margin-top:18px">
+
+          <div style="margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
             <button id="retry">Retry Quiz</button>
+            <button id="download">Download responses (JSON)</button>
+            <button id="viewRaw" class="secondary">View responses</button>
+          </div>
+
+          <div id="rawWrap" style="margin-top:18px; display:none">
+            <h4 class="small">Responses (JSON)</h4>
+            <pre id="raw"></pre>
           </div>
         </div>
       `;
+
       document.getElementById('retry').addEventListener('click', () => {
+        // reset everything and reload fresh
         location.reload();
       });
+
+      document.getElementById('download').addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(responses, null, 2));
+        const dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute('href', dataStr);
+        const filename = `quiz-responses-${(new Date()).toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+        dlAnchor.setAttribute('download', filename);
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        dlAnchor.remove();
+      });
+
+      document.getElementById('viewRaw').addEventListener('click', () => {
+        const rawWrap = document.getElementById('rawWrap');
+        const raw = document.getElementById('raw');
+        if(rawWrap.style.display === 'none'){
+          rawWrap.style.display = 'block';
+          raw.textContent = JSON.stringify(responses, null, 2);
+        } else {
+          rawWrap.style.display = 'none';
+        }
+      });
     }
+
+    // keyboard support: arrows + enter
+    document.addEventListener('keydown', (e) => {
+      const opts = Array.from(document.querySelectorAll('.option'));
+      if (!opts.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        let next = (selectedIndex === null) ? 0 : Math.min(selectedIndex + 1, opts.length - 1);
+        opts.forEach(n => n.classList.remove('selected'));
+        opts[next].classList.add('selected');
+        selectedIndex = next;
+        nextBtn.disabled = false;
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        let prev = (selectedIndex === null) ? 0 : Math.max(selectedIndex - 1, 0);
+        opts.forEach(n => n.classList.remove('selected'));
+        opts[prev].classList.add('selected');
+        selectedIndex = prev;
+        nextBtn.disabled = false;
+      } else if (e.key === 'Enter') {
+        if (!nextBtn.disabled) nextBtn.click();
+      }
+    });
 
     // start
     loadQuestion();
